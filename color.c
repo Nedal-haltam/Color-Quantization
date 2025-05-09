@@ -7,7 +7,7 @@
 #include "stb_image.h"
 #include "stb_image_write.h"
 
-#define K 2 // Number of color clusters
+#define K 8
 #define MAX_ITER 20
 
 typedef struct {
@@ -24,7 +24,7 @@ float color_distance(Color a, Color b) {
 }
 
 // this returns the index of the closest centroid
-int closest_cluster(Color color, Color *centroids) {
+int ClosestCluster(Color color, Color *centroids) {
     int index = 0;
     float min_dist = color_distance(color, centroids[0]);
 
@@ -38,83 +38,94 @@ int closest_cluster(Color color, Color *centroids) {
     return index;
 }
 
-void kmeans_quantization(unsigned char *image, int width, int height, int channels) {
-    int pixels = width * height;
-    Point *points = malloc(sizeof(Point) * pixels);
+void Cluster(Color* Centroids, Point* Points, int count)
+{
+    // Assign pixels to nearest centroid
+    for (int i = 0; i < count; ++i) {
+        Points[i].index = ClosestCluster(Points[i].color, Centroids);
+    }
 
-    // decompose image -> colors
-    for (int i = 0; i < pixels; ++i) {
-        points[i].color.r = image[i * channels];
-        points[i].color.g = image[i * channels + 1];
-        points[i].color.b = image[i * channels + 2];
+    // Recompute Centroids
+    int CentroidCount[K] = {0};
+    Color NewCentroids[K] = {0};
+
+    for (int i = 0; i < count; ++i) {
+        int cluster = Points[i].index;
+        NewCentroids[cluster].r += Points[i].color.r;
+        NewCentroids[cluster].g += Points[i].color.g;
+        NewCentroids[cluster].b += Points[i].color.b;
+        CentroidCount[cluster]++;
+    }
+
+    for (int i = 0; i < K; ++i) {
+        if (CentroidCount[i] > 0) {
+            Centroids[i].r = NewCentroids[i].r / CentroidCount[i];
+            Centroids[i].g = NewCentroids[i].g / CentroidCount[i];
+            Centroids[i].b = NewCentroids[i].b / CentroidCount[i];
+        }
+    }    
+}
+
+Color* Initialize(Point* Points, Color* centroids, unsigned char *Image, int Channels, int count)
+{
+    // decompose Image -> colors
+    for (int i = 0; i < count; ++i) {
+        Points[i].color.r = Image[i * Channels];
+        Points[i].color.g = Image[i * Channels + 1];
+        Points[i].color.b = Image[i * Channels + 2];
     }
     // Initialize centroids randomly
-    Color centroids[K];
+    
     for (int i = 0; i < K; ++i) {
-        int rand_index = rand() % pixels;
-        centroids[i] = points[rand_index].color;
+        int rand_index = rand() % count;
+        centroids[i] = Points[rand_index].color;
     }
+    return centroids;
+}
 
+void kmeans_quantization(unsigned char *Image, int Width, int Height, int Channels) {
+    int Pixels = Width * Height;
+    Point *Points = malloc(sizeof(Point) * Pixels);
 
+    Color centroids[K];
+    Initialize(Points, centroids, Image, Channels, Pixels);
+    // run k-means
     for (int iter = 0; iter < MAX_ITER; ++iter) {
-        // Assign pixels to nearest centroid
-        for (int i = 0; i < pixels; ++i) {
-            points[i].index = closest_cluster(points[i].color, centroids);
-        }
-
-        // Recompute centroids
-        int count[K] = {0};
-        Color new_centroids[K] = {0};
-
-        for (int i = 0; i < pixels; ++i) {
-            int cluster = points[i].index;
-            new_centroids[cluster].r += points[i].color.r;
-            new_centroids[cluster].g += points[i].color.g;
-            new_centroids[cluster].b += points[i].color.b;
-            count[cluster]++;
-        }
-
-        for (int i = 0; i < K; ++i) {
-            if (count[i] > 0) {
-                centroids[i].r = new_centroids[i].r / count[i];
-                centroids[i].g = new_centroids[i].g / count[i];
-                centroids[i].b = new_centroids[i].b / count[i];
-            }
-        }
+        Cluster(centroids, Points, Pixels);
     }
 
     // Apply quantization
-    for (int i = 0; i < pixels; ++i) {
-        Color c = centroids[points[i].index];
-        image[i * channels]     = (unsigned char)c.r;
-        image[i * channels + 1] = (unsigned char)c.g;
-        image[i * channels + 2] = (unsigned char)c.b;
+    for (int i = 0; i < Pixels; ++i) {
+        Color c = centroids[Points[i].index];
+        Image[i * Channels]     = (unsigned char)c.r;
+        Image[i * Channels + 1] = (unsigned char)c.g;
+        Image[i * Channels + 2] = (unsigned char)c.b;
     }
 
-    free(points);
+    free(Points);
 }
 
 int main(int argc, char *argv[]) {
     if (argc < 3) {
-        printf("Usage: %s input_image output_image\n", argv[0]);
+        printf("Usage: %s input_Image output_Image\n", argv[0]);
         return 1;
     }
 
-    int width, height, channels;
-    unsigned char *image = stbi_load(argv[1], &width, &height, &channels, 3);
-    if (!image) {
-        fprintf(stderr, "Failed to load image\n");
+    int Width, Height, Channels;
+    unsigned char *Image = stbi_load(argv[1], &Width, &Height, &Channels, 3);
+    if (!Image) {
+        fprintf(stderr, "Failed to load Image\n");
         return 1;
     }
 
-    printf("Loaded image: %dx%d with %d channels\n", width, height, channels);
+    printf("Loaded Image: %dx%d with %d Channels\n", Width, Height, Channels);
 
-    kmeans_quantization(image, width, height, 3);
+    kmeans_quantization(Image, Width, Height, 3);
 
-    if (!stbi_write_png(argv[2], width, height, 3, image, width * 3)) {
-        fprintf(stderr, "Failed to write image\n");
+    if (!stbi_write_png(argv[2], Width, Height, 3, Image, Width * 3)) {
+        fprintf(stderr, "Failed to write Image\n");
     }
 
-    stbi_image_free(image);
+    stbi_image_free(Image);
     return 0;
 }
