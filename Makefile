@@ -3,8 +3,6 @@
 ARGS= .\Ada_lovelace.png .\output.png
 # ARGS= .\Lena_512.png .\output.png
 
-.PHONY: all build run clean
-
 all: build run
 
 build: main.c
