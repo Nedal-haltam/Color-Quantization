@@ -182,7 +182,6 @@ int main(int argc, char *argv[]) {
     Rectangle dest = (Rectangle) { .x = w / 2 - scale*texture.width / 2, .y = h / 2 - scale*texture.height / 2, .width = scale*texture.width, .height = scale*texture.height};
     Rectangle lines = (Rectangle) { .x = dest.x - thick, .y = dest.y - thick, .width = dest.width + 2 * thick, .height = dest.height + 2 * thick};
     bool QUANTIZE = false;
-    int NumberEntered = 0;
     while (!WindowShouldClose())
     {
         w = GetScreenWidth();
@@ -210,14 +209,11 @@ int main(int argc, char *argv[]) {
                 key -= KEY_ZERO;
             else if (KEY_KP_0 <= key && key <= KEY_KP_9)
                 key -= KEY_KP_0;
-            NumberEntered *= 10;
-            NumberEntered += key;
+            NumberOfColors *= 10;
+            NumberOfColors += key;
         }
-        if (IsKeyPressed(KEY_ENTER) || IsKeyPressed(KEY_KP_ENTER))
-        {
-            NumberOfColors = NumberEntered;
-            NumberEntered = 0;
-        }
+        if (IsKeyPressed(KEY_R))
+            NumberOfColors = 0;
         if (IsKeyPressed(KEY_Q))
             QUANTIZE = true;
 
