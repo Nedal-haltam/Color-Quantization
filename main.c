@@ -161,19 +161,45 @@ Image meLoadImage(const char* FilePath)
     return image;
 }
 
-int main(int argc, char *argv[]) {
-
-    if (argc < 3) {
-        printf("Usage: %s input_Image output_Image\n", argv[0]);
-        return 1;
+bool ImageLoaded = false;
+char ImageFilePath[1024];
+const char* OutputFilePath = NULL;
+bool LoadImageDropped()
+{
+    if (IsFileDropped()) {
+        FilePathList FilePathList = LoadDroppedFiles();
+        printf("file %s dropped\n", FilePathList.paths[0]);
+        if (FilePathList.count > 0) {
+            snprintf(ImageFilePath, sizeof(ImageFilePath), "%s", FilePathList.paths[0]);
+            UnloadDroppedFiles(FilePathList);
+            return true;
+        }
+        UnloadDroppedFiles(FilePathList);
     }
-    const char* ImageFilePath = argv[1];
-    const char* OutputFilePath = argv[2];
+    return false;
+}
+
+int main(int argc, char *argv[]) 
+{
     SetConfigFlags(FLAG_WINDOW_RESIZABLE | FLAG_WINDOW_ALWAYS_RUN);
     InitWindow(w, h, "Color Quantization");
     SetTargetFPS(60);
-    Image image = meLoadImage(ImageFilePath);
-    Texture2D texture = LoadTextureFromImage(image);
+    Image image;
+    Texture2D texture;
+    if (argc == 2) {
+        OutputFilePath = argv[1];
+    }
+    else if (argc == 3) {
+        snprintf(ImageFilePath, sizeof(ImageFilePath), "%s", argv[1]);
+        OutputFilePath = argv[2];
+        image = LoadImage(ImageFilePath);
+        if (image.data == NULL) {
+            fprintf(stderr, "Failed to load image: %s\n", ImageFilePath);
+            return 1;
+        }
+        texture = LoadTextureFromImage(image);
+        ImageLoaded = true;
+    }
     // in general it takes some time...
     // NumberOfColors = count_unique_colors((uint32_t*)image.data, image.width * image.height);
     NumberOfColors = 1;
@@ -186,62 +212,86 @@ int main(int argc, char *argv[]) {
     {
         w = GetScreenWidth();
         h = GetScreenHeight();
-        if (QUANTIZE)
+        if (!ImageLoaded)
         {
-            QUANTIZE = false;
-            UnloadImage(image);
-            image = meLoadImage(ImageFilePath);
-            kmeans_quantization((uint32_t*)image.data, image.width, image.height);
-            UnloadTexture(texture);
-            texture = LoadTextureFromImage(image);
-        }
-        if (IsKeyPressed(KEY_S))
-        {
-            if (!ExportImage(image, OutputFilePath))
+            BeginDrawing();
+            ClearBackground(BACKGROUND_COLOR);
+            const char* msg = "Drag&Drop an image here.";
+            int msgWidth = MeasureText(msg, fontsize);
+            DrawText(msg, w / 2 - msgWidth / 2, h / 2 - fontsize / 2, fontsize, RAYWHITE);
+            if (LoadImageDropped())
             {
-                fprintf(stderr, "Could not save image\n");
+                ImageLoaded = true;
             }
-        }
-        int key = GetKeyPressed();
-        if ((KEY_ZERO <= key && key <= KEY_NINE) || (KEY_KP_0 <= key && key <= KEY_KP_9))
-        {
-            if (KEY_ZERO <= key && key <= KEY_NINE)
-                key -= KEY_ZERO;
-            else if (KEY_KP_0 <= key && key <= KEY_KP_9)
-                key -= KEY_KP_0;
-            NumberOfColors *= 10;
-            NumberOfColors += key;
-        }
-        if (IsKeyPressed(KEY_R))
-            NumberOfColors = 0;
-        if (IsKeyPressed(KEY_Q))
-            QUANTIZE = true;
-
-        BeginDrawing();
-        ClearBackground(BACKGROUND_COLOR);
-        
-        DrawRectangleLinesEx(lines, thick / 4, RAYWHITE);
-        DrawTexturePro(texture, (Rectangle) { .x = 0, .y = 0, .width = texture.width, .height = texture.height}, dest, (Vector2) {.x = 0, .y = 0}, 0, WHITE);
-
-        const char* ColorCountText = TextFormat("Current Number of Colors: %d", NumberOfColors);
-        int ColorCountTextWidth = MeasureText(ColorCountText, fontsize);
-        DrawText(ColorCountText, w / 2 - ColorCountTextWidth / 2, dest.y + dest.height + fontsize / 2, fontsize, RAYWHITE);
-        
-        if (QUANTIZE)
-        {
-            const char* StatusText = "Quantizing...";
-            int StatusTextWidth = MeasureText(StatusText, fontsize);
-            DrawText(StatusText, w / 2 - StatusTextWidth / 2, dest.y + dest.height + 2 * fontsize, fontsize, RAYWHITE);
+            DrawFPS(0, 0);
+            EndDrawing();
         }
         else
         {
-            const char* DoneText = "Done.";
-            int DoneTextWidth = MeasureText(DoneText, fontsize);
-            DrawText(DoneText, w / 2 - DoneTextWidth / 2, dest.y + dest.height + 2 * fontsize, fontsize, RAYWHITE);
-        }
+            if (QUANTIZE)
+            {
+                QUANTIZE = false;
+                UnloadImage(image);
+                image = meLoadImage(ImageFilePath);
+                kmeans_quantization((uint32_t*)image.data, image.width, image.height);
+                UnloadTexture(texture);
+                texture = LoadTextureFromImage(image);
+            }
+            if (IsKeyPressed(KEY_S))
+            {
+                if (!OutputFilePath) 
+                {
+                    fprintf(stderr, "Output File Path was not specified in command line arguments\n");
+                }
+                else if (!ExportImage(image, OutputFilePath))
+                {
+                    fprintf(stderr, "Could not save image\n");
+                }
+            }
+            int key = GetKeyPressed();
+            if ((KEY_ZERO <= key && key <= KEY_NINE) || (KEY_KP_0 <= key && key <= KEY_KP_9))
+            {
+                if (KEY_ZERO <= key && key <= KEY_NINE)
+                    key -= KEY_ZERO;
+                else if (KEY_KP_0 <= key && key <= KEY_KP_9)
+                    key -= KEY_KP_0;
+                NumberOfColors *= 10;
+                NumberOfColors += key;
+            }
+            if (IsKeyPressed(KEY_R))
+                NumberOfColors = 0;
+            if (IsKeyPressed(KEY_Q))
+                QUANTIZE = true;
 
-        DrawFPS(0, 0);
-        EndDrawing();
+            BeginDrawing();
+            ClearBackground(BACKGROUND_COLOR);
+            
+            DrawRectangleLinesEx(lines, thick / 4, RAYWHITE);
+            DrawTexturePro(texture, (Rectangle) { .x = 0, .y = 0, .width = texture.width, .height = texture.height}, dest, (Vector2) {.x = 0, .y = 0}, 0, WHITE);
+
+            const char* ColorCountText = TextFormat("Current Number of Colors: %d", NumberOfColors);
+            int ColorCountTextWidth = MeasureText(ColorCountText, fontsize);
+            DrawText(ColorCountText, w / 2 - ColorCountTextWidth / 2, dest.y + dest.height + fontsize / 2, fontsize, RAYWHITE);
+            
+            if (QUANTIZE)
+            {
+                const char* StatusText = "Quantizing...";
+                int StatusTextWidth = MeasureText(StatusText, fontsize);
+                DrawText(StatusText, w / 2 - StatusTextWidth / 2, dest.y + dest.height + 2 * fontsize, fontsize, RAYWHITE);
+            }
+            else
+            {
+                const char* DoneText = "Done.";
+                int DoneTextWidth = MeasureText(DoneText, fontsize);
+                DrawText(DoneText, w / 2 - DoneTextWidth / 2, dest.y + dest.height + 2 * fontsize, fontsize, RAYWHITE);
+            }
+            if (LoadImageDropped())
+            {
+                ImageLoaded = true;
+            }
+            DrawFPS(0, 0);
+            EndDrawing();
+        }
     }
     UnloadImage(image);
     UnloadTexture(texture);
