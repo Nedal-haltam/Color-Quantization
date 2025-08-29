@@ -47,7 +47,7 @@ gcc main.c -o main -Iraylib/include -Lraylib/lib -l:libraylib.a -lm
 ### 🧠 Run
 
 ```bash
-./quantize.exe input.png output.png
+./main input.png output.png
 ```
 
 ### 🪄 Controls
