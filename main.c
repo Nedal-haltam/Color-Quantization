@@ -146,11 +146,30 @@ void kmeans_quantization(uint32_t *image, int Width, int Height) {
 int w = 800;
 int h = 600;
 float scale = 0.4f;
+float thick = 4.0f;
+int fontsize = 20;
 #define BACKGROUND_COLOR ((Color){ .r = 0x20, .g = 0x20, .b = 0x20, .a = 0xFF})
+
+Image meLoadImage(const char* FilePath)
+{
+    int width = 0, height = 0, n = 0;
+    Image image = {
+        .data = (void*)stbi_load(FilePath, &width, &height, &n, 4),
+        .mipmaps = 1,
+        .width = width,
+        .height = height,
+        .format = PIXELFORMAT_UNCOMPRESSED_R8G8B8A8,
+    };
+    return image;
+}
 
 bool ImageLoaded = false;
 char ImageFilePath[1024];
 const char* OutputFilePath = NULL;
+Image image;
+Texture2D texture;
+Rectangle dest;
+Rectangle lines;
 bool LoadImageDropped()
 {
     if (IsFileDropped()) {
@@ -166,20 +185,32 @@ bool LoadImageDropped()
     return false;
 }
 
+void UpdateImageAndTexture()
+{
+    image = meLoadImage(ImageFilePath);
+    if (image.data == NULL) {
+        fprintf(stderr, "Failed to load image: %s\n", ImageFilePath);
+        exit(1);
+    }
+    texture = LoadTextureFromImage(image);
+    dest = (Rectangle) { .x = w / 2 - scale*texture.width / 2, .y = h / 2 - scale*texture.height / 2, .width = scale*texture.width, .height = scale*texture.height};
+    lines = (Rectangle) { .x = dest.x - thick, .y = dest.y - thick, .width = dest.width + 2 * thick, .height = dest.height + 2 * thick};
+    ImageLoaded = true;
+
+}
+
 int main(int argc, char *argv[]) 
 {
     SetConfigFlags(FLAG_WINDOW_RESIZABLE | FLAG_WINDOW_ALWAYS_RUN);
     InitWindow(w, h, "Color Quantization");
     SetTargetFPS(60);
-    Image image;
-    Texture2D texture;
     if (argc == 2) {
         OutputFilePath = argv[1];
     }
     else if (argc == 3) {
         snprintf(ImageFilePath, sizeof(ImageFilePath), "%s", argv[1]);
         OutputFilePath = argv[2];
-        image = LoadImage(ImageFilePath);
+        image = meLoadImage(ImageFilePath);
         if (image.data == NULL) {
             fprintf(stderr, "Failed to load image: %s\n", ImageFilePath);
             return 1;
@@ -190,10 +221,6 @@ int main(int argc, char *argv[])
     // in general it takes some time...
     // NumberOfColors = count_unique_colors((uint32_t*)image.data, image.width * image.height);
     NumberOfColors = 1;
-    float thick = 4.0f;
-    int fontsize = 20;
-    Rectangle dest;
-    Rectangle lines;
     bool QUANTIZE = false;
     while (!WindowShouldClose())
     {
@@ -208,15 +235,7 @@ int main(int argc, char *argv[])
             DrawText(msg, w / 2 - msgWidth / 2, h / 2 - fontsize / 2, fontsize, RAYWHITE);
             if (LoadImageDropped())
             {
-                image = LoadImage(ImageFilePath);
-                if (image.data == NULL) {
-                    fprintf(stderr, "Failed to load image: %s\n", ImageFilePath);
-                    return 1;
-                }
-                texture = LoadTextureFromImage(image);
-                dest = (Rectangle) { .x = w / 2 - scale*texture.width / 2, .y = h / 2 - scale*texture.height / 2, .width = scale*texture.width, .height = scale*texture.height};
-                lines = (Rectangle) { .x = dest.x - thick, .y = dest.y - thick, .width = dest.width + 2 * thick, .height = dest.height + 2 * thick};
-                ImageLoaded = true;
+                UpdateImageAndTexture();
             }
             DrawFPS(0, 0);
         }
@@ -226,7 +245,7 @@ int main(int argc, char *argv[])
             {
                 QUANTIZE = false;
                 UnloadImage(image);
-                image = LoadImage(ImageFilePath);
+                image = meLoadImage(ImageFilePath);
                 kmeans_quantization((uint32_t*)image.data, image.width, image.height);
                 UnloadTexture(texture);
                 texture = LoadTextureFromImage(image);
@@ -280,7 +299,7 @@ int main(int argc, char *argv[])
             if (LoadImageDropped())
             {
                 UnloadImage(image);
-                image = LoadImage(ImageFilePath);
+                image = meLoadImage(ImageFilePath);
                 if (image.data == NULL) {
                     fprintf(stderr, "Failed to load image: %s\n", ImageFilePath);
                     return 1;
