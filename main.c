@@ -192,26 +192,33 @@ int main(int argc, char *argv[])
     NumberOfColors = 1;
     float thick = 4.0f;
     int fontsize = 20;
-    Rectangle dest = (Rectangle) { .x = w / 2 - scale*texture.width / 2, .y = h / 2 - scale*texture.height / 2, .width = scale*texture.width, .height = scale*texture.height};
-    Rectangle lines = (Rectangle) { .x = dest.x - thick, .y = dest.y - thick, .width = dest.width + 2 * thick, .height = dest.height + 2 * thick};
+    Rectangle dest;
+    Rectangle lines;
     bool QUANTIZE = false;
     while (!WindowShouldClose())
     {
         w = GetScreenWidth();
         h = GetScreenHeight();
+        BeginDrawing();
+        ClearBackground(BACKGROUND_COLOR);
         if (!ImageLoaded)
         {
-            BeginDrawing();
-            ClearBackground(BACKGROUND_COLOR);
             const char* msg = "Drag&Drop an image here.";
             int msgWidth = MeasureText(msg, fontsize);
             DrawText(msg, w / 2 - msgWidth / 2, h / 2 - fontsize / 2, fontsize, RAYWHITE);
             if (LoadImageDropped())
             {
+                image = LoadImage(ImageFilePath);
+                if (image.data == NULL) {
+                    fprintf(stderr, "Failed to load image: %s\n", ImageFilePath);
+                    return 1;
+                }
+                texture = LoadTextureFromImage(image);
+                dest = (Rectangle) { .x = w / 2 - scale*texture.width / 2, .y = h / 2 - scale*texture.height / 2, .width = scale*texture.width, .height = scale*texture.height};
+                lines = (Rectangle) { .x = dest.x - thick, .y = dest.y - thick, .width = dest.width + 2 * thick, .height = dest.height + 2 * thick};
                 ImageLoaded = true;
             }
             DrawFPS(0, 0);
-            EndDrawing();
         }
         else
         {
@@ -250,8 +257,6 @@ int main(int argc, char *argv[])
             if (IsKeyPressed(KEY_Q))
                 QUANTIZE = true;
 
-            BeginDrawing();
-            ClearBackground(BACKGROUND_COLOR);
             
             DrawRectangleLinesEx(lines, thick / 4, RAYWHITE);
             DrawTexturePro(texture, (Rectangle) { .x = 0, .y = 0, .width = texture.width, .height = texture.height}, dest, (Vector2) {.x = 0, .y = 0}, 0, WHITE);
@@ -262,8 +267,8 @@ int main(int argc, char *argv[])
             
             if (QUANTIZE)
             {
-                const char* StatusText = "Quantizing...";
-                int StatusTextWidth = MeasureText(StatusText, fontsize);
+                    const char* StatusText = "Quantizing...";
+                    int StatusTextWidth = MeasureText(StatusText, fontsize);
                 DrawText(StatusText, w / 2 - StatusTextWidth / 2, dest.y + dest.height + 2 * fontsize, fontsize, RAYWHITE);
             }
             else
@@ -274,11 +279,21 @@ int main(int argc, char *argv[])
             }
             if (LoadImageDropped())
             {
+                UnloadImage(image);
+                image = LoadImage(ImageFilePath);
+                if (image.data == NULL) {
+                    fprintf(stderr, "Failed to load image: %s\n", ImageFilePath);
+                    return 1;
+                }
+                UnloadTexture(texture);
+                texture = LoadTextureFromImage(image);
+                dest = (Rectangle) { .x = w / 2 - scale*texture.width / 2, .y = h / 2 - scale*texture.height / 2, .width = scale*texture.width, .height = scale*texture.height};
+                lines = (Rectangle) { .x = dest.x - thick, .y = dest.y - thick, .width = dest.width + 2 * thick, .height = dest.height + 2 * thick};
                 ImageLoaded = true;
             }
             DrawFPS(0, 0);
-            EndDrawing();
         }
+        EndDrawing();
     }
     UnloadImage(image);
     UnloadTexture(texture);
