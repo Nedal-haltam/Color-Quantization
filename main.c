@@ -148,19 +148,6 @@ int h = 600;
 float scale = 0.4f;
 #define BACKGROUND_COLOR ((Color){ .r = 0x20, .g = 0x20, .b = 0x20, .a = 0xFF})
 
-Image meLoadImage(const char* FilePath)
-{
-    int width = 0, height = 0, n = 0;
-    Image image = {
-        .data = (void*)stbi_load(FilePath, &width, &height, &n, 4),
-        .mipmaps = 1,
-        .width = width,
-        .height = height,
-        .format = PIXELFORMAT_UNCOMPRESSED_R8G8B8A8,
-    };
-    return image;
-}
-
 bool ImageLoaded = false;
 char ImageFilePath[1024];
 const char* OutputFilePath = NULL;
@@ -232,7 +219,7 @@ int main(int argc, char *argv[])
             {
                 QUANTIZE = false;
                 UnloadImage(image);
-                image = meLoadImage(ImageFilePath);
+                image = LoadImage(ImageFilePath);
                 kmeans_quantization((uint32_t*)image.data, image.width, image.height);
                 UnloadTexture(texture);
                 texture = LoadTextureFromImage(image);
